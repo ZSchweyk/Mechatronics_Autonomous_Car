@@ -23,6 +23,7 @@ DualMAX14870MotorShield motors;
 //float dist_threshold = 15; // cm
 int signal = 13;
 int distance = 0;
+int speed = 100;
 unsigned long pulseduration = 0;
 
 int encoderCountsOneRev = 118;
@@ -87,7 +88,6 @@ void loop() {
         if (color == 1) {
           current_state = LEFT;
         }
-        // currrent_state = LEFT;
 
         if (color == 2) {
           current_state = RIGHT;
@@ -110,7 +110,6 @@ void loop() {
       Serial.println("left");
       current_state = FORWARD;
       break;
-
     case TURN180:
       turn_180();
       Serial.print(" Current state: ");
@@ -118,6 +117,10 @@ void loop() {
       current_state = FORWARD;
       break;
     case BACKWARD:
+      backward();
+      Serial.print(" Current state: ");
+      Serial.println("backward");
+      current_state = FORWARD; // change depending on FSM
       break;
     case STOP:
       stop();
@@ -162,17 +165,15 @@ void turn_right() {
   Serial.println("right_function");
   motors.enableDrivers();
   int initialM2EncoderCount = m2EncoderCount;
-  motors.setM2Speed(-100);
-  motors.setM1Speed(100);
+  motors.setM1Speed(speed);
+  motors.setM2Speed(-speed);
   // while (abs(m2EncoderCount - initialM2EncoderCount) < encoderCountsOneRev * .5) {
   //   // wait
   //   //Serial.print("encoder count: ");
   //   //Serial.println(m2EncoderCount - initialM2EncoderCount);
   // }
   delay(1000);
-  //stop();
-
-  //Serial.println("right_end_function");
+  stop();
 }
 
 void turn_left() {
@@ -185,15 +186,14 @@ void turn_left() {
   Serial.println("left_function");
   motors.enableDrivers();
   int initialM2EncoderCount = m2EncoderCount;
-  motors.setM2Speed(100);
-  motors.setM1Speed(-100);
+  motors.setM1Speed(-speed);
+  motors.setM2Speed(speed);
   // while (abs(m2EncoderCount - initialM2EncoderCount) < encoderCountsOneRev * .5) {
   //   // wait
   //   //Serial.print("encoder count: ");
   //   //Serial.println(m2EncoderCount - initialM2EncoderCount);
   // }
   delay(1000);
-  Serial.println("left-end");
   stop();
 }
 
@@ -201,24 +201,24 @@ void turn_180() {
 
   Serial.println("180_function");
   motors.enableDrivers();
-  motors.setM1Speed(100);
-  motors.setM2Speed(-100);
+  motors.setM1Speed(-speed);
+  motors.setM2Speed(speed);
   delay(2000);
-  //stop();
-
-  //Serial.println("180_end_function");
+  stop();
 }
 
 void go_forward() {
   motors.enableDrivers();
-  motors.setM1Speed(100);
-  motors.setM2Speed(100);
+  motors.setM1Speed(speed);
+  motors.setM2Speed(speed);
 }
 
 void go_backward() {
   motors.enableDrivers();
-  motors.setM1Speed(-200);
-  motors.setM2Speed(-200);
+  motors.setM1Speed(-speed);
+  motors.setM2Speed(-speed);
+  delay(1000);
+  stop();
 }
 
 void stop() {
