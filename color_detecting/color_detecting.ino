@@ -5,8 +5,20 @@
 #define encoder2PinA 18
 #define encoder2PinB 19
 
+// INPUTS
+int DISTANCE_THRESHOLD = 7;
+unsigned long TURN_START_DELAY = 3000;
+unsigned long TURN_END_DELAY = 3000;
+int speed = 150;
+int encoderCountsOneRev = 118;
+int QUARTER_TURN_COUNTS = encoderCountsOneRev * 0.5;
+////////////////////////////////////////////////////
+
+
 volatile long m1EncoderCount = 0;
 volatile long m2EncoderCount = 0;
+int signal = 13;
+int distance = 0;
 
 enum FSM {
   RIGHT,    // right
@@ -20,15 +32,6 @@ enum FSM {
 
 Pixy2 pixy;
 DualMAX14870MotorShield motors;
-//float dist_threshold = 15; // cm
-int signal = 13;
-int distance = 0;
-int speed = 100;
-unsigned long pulseduration = 0;
-
-int encoderCountsOneRev = 118;
-
-
 FSM current_state;
 
 void setup() {
@@ -50,15 +53,15 @@ int measureDistance() {
   digitalWrite(signal, LOW);
 
   pinMode(signal, INPUT);
-  pulseduration = pulseIn(signal, HIGH);  // maybe make local
+  unsigned long pulseduration = pulseIn(signal, HIGH);  // maybe make local
   return 0.0343 * pulseduration / 2;
 }
 void loop() {
-
+  // delay(250);
   distance = measureDistance();
 
   Serial.print("distance: ");
-  Serial.print(distance);
+  Serial.println(distance);
 
   pixy.ccc.getBlocks();
   uint16_t color;
@@ -69,8 +72,8 @@ void loop() {
     uint16_t y = pixy.ccc.blocks[0].m_y;
     uint16_t width = pixy.ccc.blocks[0].m_width;
 
-    Serial.print(" Color: ");
-    Serial.print(color);
+    Serial.print("Color: ");
+    Serial.println(color);
     //Serial.print(" X: "); Serial.print(x);
     //Serial.print(" Y: "); Serial.print(y);
     //Serial.print(" Width: "); Serial.println(width);
@@ -82,42 +85,47 @@ void loop() {
       go_forward();
       Serial.print("Current state: ");
       Serial.println("forward");
-      if (distance <= 4) {
+      if (distance <= DISTANCE_THRESHOLD) {
         //stop();
         // check color and change state
         if (color == 1) {
           current_state = LEFT;
-        }
-
-        if (color == 2) {
+        } else if (color == 2) {
           current_state = RIGHT;
-        }
-
-        if (color == 3) {
+        } else if (color == 3) {
           current_state = TURN180;
         }
       }
       break;
     case RIGHT:
-      turn_right();
+      stop();
+      delay(TURN_START_DELAY);
+      turn(1, 90);
+      delay(TURN_END_DELAY);
       Serial.print(" Current state: ");
       Serial.println("right");
       current_state = FORWARD;
       break;
     case LEFT:
-      turn_left();
+      stop();
+      delay(TURN_START_DELAY);
+      turn(-1, 90);
+      delay(TURN_END_DELAY);
       Serial.print("Current state: ");
       Serial.println("left");
       current_state = FORWARD;
       break;
     case TURN180:
-      turn_180();
+      stop();
+      delay(TURN_START_DELAY);
+      turn(1, 180);
+      delay(TURN_END_DELAY);
       Serial.print(" Current state: ");
       Serial.println("180");
       current_state = FORWARD;
       break;
     case BACKWARD:
-      backward();
+      // backward();
       Serial.print(" Current state: ");
       Serial.println("backward");
       current_state = FORWARD; // change depending on FSM
@@ -130,20 +138,24 @@ void loop() {
   }
 }
 
-void doEncoder1() {
-  if (digitalRead(encoder1PinA) == digitalRead(encoder1PinB)) {
-    m1EncoderCount++;
-  } else {
-    m1EncoderCount--;
-  }
-}
+/* 
+  direction: -1 = left, 1 = right
+*/
+void turn(int direction, int deg) {
+  motors.enableDrivers();
+  int initialM2EncoderCount = m2EncoderCount;
 
-void doEncoder2() {
-  if (digitalRead(encoder2PinA) == digitalRead(encoder2PinB)) {
-    m2EncoderCount++;
-  } else {
-    m2EncoderCount--;
+  motors.setM1Speed(direction * speed);
+  motors.setM2Speed(-direction * speed);
+  
+  while (abs(m2EncoderCount - initialM2EncoderCount) < QUARTER_TURN_COUNTS * deg / 90) {
+    // wait
+    // Serial.print("encoder count: ");
+    Serial.print(m2EncoderCount - initialM2EncoderCount);
+    Serial.print(" out of ");
+    Serial.println(QUARTER_TURN_COUNTS * deg / 90);
   }
+  stop();
 }
 
 void turn_right() {
@@ -167,11 +179,11 @@ void turn_right() {
   int initialM2EncoderCount = m2EncoderCount;
   motors.setM1Speed(speed);
   motors.setM2Speed(-speed);
-  // while (abs(m2EncoderCount - initialM2EncoderCount) < encoderCountsOneRev * .5) {
-  //   // wait
-  //   //Serial.print("encoder count: ");
-  //   //Serial.println(m2EncoderCount - initialM2EncoderCount);
-  // }
+  while (abs(m2EncoderCount - initialM2EncoderCount) < encoderCountsOneRev * .5) {
+    // wait
+    //Serial.print("encoder count: ");
+    //Serial.println(m2EncoderCount - initialM2EncoderCount);
+  }
   delay(1000);
   stop();
 }
@@ -183,18 +195,24 @@ void turn_left() {
   // delay(2000);
   // stop();
 
+  
   Serial.println("left_function");
   motors.enableDrivers();
   int initialM2EncoderCount = m2EncoderCount;
   motors.setM1Speed(-speed);
   motors.setM2Speed(speed);
-  // while (abs(m2EncoderCount - initialM2EncoderCount) < encoderCountsOneRev * .5) {
-  //   // wait
-  //   //Serial.print("encoder count: ");
-  //   //Serial.println(m2EncoderCount - initialM2EncoderCount);
-  // }
-  delay(1000);
+  
+  Serial.print("Max encoder count: ");
+  Serial.println(encoderCountsOneRev * .5);
+  while (abs(m2EncoderCount - initialM2EncoderCount) < encoderCountsOneRev * .5) {
+    // wait
+    // Serial.print("encoder count: ");
+    Serial.print(m2EncoderCount - initialM2EncoderCount);
+    Serial.print(" out of ");
+    Serial.println(encoderCountsOneRev * .5);
+  }
   stop();
+  
 }
 
 void turn_180() {
@@ -225,4 +243,23 @@ void stop() {
   motors.setM1Speed(0);
   motors.setM2Speed(0);
   motors.disableDrivers();
+}
+
+
+
+
+void doEncoder1() {
+  if (digitalRead(encoder1PinA) == digitalRead(encoder1PinB)) {
+    m1EncoderCount++;
+  } else {
+    m1EncoderCount--;
+  }
+}
+
+void doEncoder2() {
+  if (digitalRead(encoder2PinA) == digitalRead(encoder2PinB)) {
+    m2EncoderCount++;
+  } else {
+    m2EncoderCount--;
+  }
 }
